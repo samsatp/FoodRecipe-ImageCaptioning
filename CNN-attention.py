@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from tensorflow.keras.layers import Conv2D, GRU, Attention, Dense, Embedding, AveragePooling2D, Reshape
 
-class CNN_encoder(tf.keras.layers.Layer):
+class CNN_encoder(tf.keras.Model):
     def __init__(self, w, h, channel, n_cov, filters_list, kernel_sizes, n_pool):
         super().__init__()
         self.w = w
@@ -22,7 +22,9 @@ class CNN_encoder(tf.keras.layers.Layer):
         self.pooling_layers =[
                               AveragePooling2D(pool_size=(2,2)) for i in range(self.n_pool)
                              ]
-    def call(self, image, verbose=0):
+    def call(self, image, verbose):
+
+        batch_size= image.shape[0]
         if verbose: print(f'input image: {image.shape}')
         
         for i in range(self.n_cov):
@@ -32,15 +34,17 @@ class CNN_encoder(tf.keras.layers.Layer):
             image = self.pooling_layers[i](image)
             if verbose: print(f'pool_{i} output: {image.shape}')
         
-        image = tf.reshape(image, (image.shape[0], -1, image.shape[-1]))
+        #image = tf.reshape(image, [batch_size, -1, self.filters_list[-1]])
+        image = tf.keras.layers.Reshape((-1, self.filters_list[-1]))(image)
         if verbose: print(f'final output: {image.shape}')
 
         return image        
 
 
-class CNNattn(CNN_encoder):
+class CNNattn(tf.keras.Model):
     def __init__(self, vocab_size, emb_dim, gru_units, w_units, head_denses_units,**cnn_encoder_kwargs):
-        super().__init__(**cnn_encoder_kwargs)
+        super().__init__()
+        self.cnn_encoder = CNN_encoder(**cnn_encoder_kwargs)
         self.embedding = Embedding(input_dim=vocab_size, output_dim=emb_dim, mask_zero=True)
         self.gru = GRU(units = gru_units, return_sequences=True)
         
@@ -54,12 +58,15 @@ class CNNattn(CNN_encoder):
                            ]
         self.output_dense = Dense(vocab_size)
 
-    def call(self, image, text, verbose=0):
-        output_cnn_enc = super().call(image, verbose)
+    def call(self, image, text, verbose):
+
+        output_cnn_enc = self.cnn_encoder(image, verbose)
 
         emb_vectors = self.embedding(text)
+        emb_vectors = tf.expand_dims(emb_vectors, axis=1)
         if verbose: print(f'embed output: {emb_vectors.shape}')
         
+
         out_sequences = self.gru(emb_vectors)
         if verbose: print(f'GRU output: {out_sequences.shape}')
 
@@ -76,7 +83,10 @@ class CNNattn(CNN_encoder):
         output = self.output_dense(output)
         if verbose: print(f'output: {output.shape}')
 
-        return output  
+        output = tf.reshape(output, shape=(-1, output.shape[-1]))
+        if verbose: print(f'output: {output.shape}')
+
+        return output
 
 if __name__ == '__main__':
 
