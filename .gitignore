@@ -1,4 +1,5 @@
 venv
-data/images/*
+data/images/*.jpg
 .vscode
 Getting-data
+media

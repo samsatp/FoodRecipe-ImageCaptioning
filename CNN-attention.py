@@ -3,11 +3,8 @@ import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, GRU, Attention, Dense, Embedding, AveragePooling2D, Reshape
 
 class CNN_encoder(tf.keras.Model):
-    def __init__(self, w, h, channel, n_cov, filters_list, kernel_sizes, n_pool):
+    def __init__(self, n_cov, filters_list, kernel_sizes, n_pool):
         super().__init__()
-        self.w = w
-        self.h = h
-        self.channel = channel
 
         assert len(filters_list) == len(kernel_sizes)
         assert n_cov == n_pool
@@ -24,7 +21,6 @@ class CNN_encoder(tf.keras.Model):
                              ]
     def call(self, image, verbose):
 
-        batch_size= image.shape[0]
         if verbose: print(f'input image: {image.shape}')
         
         for i in range(self.n_cov):
@@ -39,7 +35,6 @@ class CNN_encoder(tf.keras.Model):
         if verbose: print(f'final output: {image.shape}')
 
         return image        
-
 
 class CNNattn(tf.keras.Model):
     def __init__(self, vocab_size, emb_dim, gru_units, w_units, head_denses_units,**cnn_encoder_kwargs):
@@ -91,17 +86,16 @@ class CNNattn(tf.keras.Model):
 if __name__ == '__main__':
 
     batch_size = 32
-    w = 64
-    h = 64
+    w = 128
+    h = 128
     channel = 3
 
     sample_images = tf.random.uniform((batch_size, w, h, channel), minval=0, maxval=1, 
                                     dtype=tf.float32, name='sample_imgs')
-    vocab_size = 100
-    sample_text = tf.random.uniform((batch_size, vocab_size), dtype=tf.int32, 
-                                    maxval=vocab_size)
+    vocab_size = 10
+    sample_text = tf.random.uniform((batch_size, vocab_size), dtype=tf.int32, maxval=vocab_size)
 
-    sample_dataset = tf.data.Dataset.from_tensor_slices((sample_images, sample_text))
+    sample_dataset = tf.data.Dataset.from_tensor_slices(({'image':sample_images, 'text':sample_text}, sample_text))
     sample_dataset = sample_dataset.batch(8)
 
     my_model = CNNattn(
@@ -110,17 +104,19 @@ if __name__ == '__main__':
         gru_units = 16,
         w_units = 64,
         head_denses_units = [100],
-        w = 64,
-        h = 64,
-        channel = 3,
         n_cov = 2,
         filters_list =[48, 48],
         kernel_sizes = [(4,4), (4,4)],
         n_pool = 2
     )
 
-    for img, text in sample_dataset.take(1):
-        print(f'imag.shape: {img.shape}')
-        print(f'text.shape: {text.shape}\n')
-        o = my_model(text=text, image=img, verbose=1)
+    for data in sample_dataset.take(1):
+        print('image.shape',data[0]['image'].shape)
+        print('text.shape',data[0]['text'].shape)
+        print('text.shape',data[1].shape)
+
+        image = data[0]['image']
+        text  = data[0]['text']
+
+        o = my_model(image, text[:,1], verbose=1)
         break
