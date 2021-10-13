@@ -2,4 +2,4 @@ venv
 data/images/*.jpg
 .vscode
 Getting-data
-media
+media/*drawio
